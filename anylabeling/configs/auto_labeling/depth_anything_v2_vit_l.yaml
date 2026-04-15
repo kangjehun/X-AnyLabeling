@@ -3,4 +3,7 @@ name: depth_anything_v2_vit_l-r20240721
 provider: HKU
 display_name: Depth Anything V2 (ViT-Large)
 model_path: https://github.com/CVHub520/X-AnyLabeling/releases/download/v2.4.0/depth_anything_v2_vitl.onnx
-render_mode: color  # 'color' or 'gray'
+render_mode: gray
+min_depth: 0.0
+max_depth: 1.0
+save_raw_depth: true
