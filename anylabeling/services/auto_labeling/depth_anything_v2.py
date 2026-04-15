@@ -129,7 +129,7 @@ class DepthAnythingV2(Model):
         result = self.postprocess(outputs, orig_shape)
 
         image_dir_path = os.path.dirname(image_path)
-        save_path = os.path.join(image_dir_path, "..", self.save_dir)
+        save_path = os.path.join(image_dir_path, self.save_dir)
         save_path = os.path.realpath(save_path)
         os.makedirs(save_path, exist_ok=True)
         image_file_name = os.path.basename(image_path)
@@ -138,13 +138,14 @@ class DepthAnythingV2(Model):
 
         if isinstance(result, tuple):
             depth_visual, depth_calibrated = result
-            cv2.imwrite(save_file, depth_visual)
             if self.save_raw_depth:
                 depth_raw_name = (
                     os.path.splitext(image_file_name)[0] + "_depth.npy"
                 )
                 depth_raw_file = os.path.join(save_path, depth_raw_name)
                 np.save(depth_raw_file, depth_calibrated)
+            else:
+                cv2.imwrite(save_file, depth_visual)
         else:
             cv2.imwrite(save_file, result)
 

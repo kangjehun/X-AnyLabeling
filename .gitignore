@@ -182,3 +182,6 @@ pnnx*
 
 # calibration image
 calibration_*.npy
+
+# temp
+TEMP.md
