@@ -54,6 +54,27 @@ save_raw_depth: true
 
 ---
 
+## 라벨 클래스 정의
+
+라벨링 JSON에는 다음 클래스 이름을 사용하고, 데이터 변환 시 아래 ID로 매핑한다.
+
+| ID | Label | 설명 |
+|---:|---|---|
+| 0 | `background` | 배경 또는 미라벨링 영역 |
+| 1 | `drivable_region` | 차량 주행 가능 영역 |
+| 2 | `car` | 차량 |
+| 3 | `ego` | 자차 노출 영역 |
+| 4 | `fence` | 펜스 및 도로 방호물 |
+| 5 | `curb` | 연석 |
+| 6 | `roadsign` | 도로 표지판류 |
+| 7 | `car_2dbbox` | 차량 2D bounding box (`rectangle`) |
+
+X-AnyLabeling JSON에는 숫자 ID가 아니라 `label` 문자열과 `shape_type`이 저장되므로, 원본 라벨링 단계에서는 이름을 정확히 맞추는 것이 중요하다. 숫자 ID는 변환 단계에서 이름을 기준으로 다시 매핑할 수 있다. 다만 현재 semantic mask 생성 코드는 빈 mask를 값 `0`으로 초기화하므로, 현 파이프라인에서는 `background`를 ID 0으로 유지한다. 나머지 ID는 모든 후처리 및 학습 설정의 매핑을 함께 변경한다면 바꿀 수 있다.
+
+Semantic segmentation은 `polygon`, 차량 2D bbox는 `car_2dbbox`와 `rectangle`을 사용한다. `car_2dbbox`는 semantic PNG mask 생성 대상에서 제외하고, 별도의 bbox 변환 단계에서 사용한다. Polygon 내부를 hole처럼 비울 때는 해당 영역에 `background` polygon을 덮어쓴다.
+
+---
+
 ## 목차
 
 - [환경 구성](#환경-구성)
