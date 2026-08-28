@@ -70,7 +70,7 @@ from .utils.qt import new_icon_path
 from .widgets import (
     AboutDialog,
     AutoLabelingWidget,
-    BrightnessContrastDialog,
+    BrightnessContrastProcessor,
     Canvas,
     CanvasAdjustmentWidget,
     ChatbotDialog,
@@ -78,7 +78,6 @@ from .widgets import (
     CompareViewManager,
     CompareViewSlider,
     VQADialog,
-    CrosshairSettingsDialog,
     FileDialogPreview,
     PPOCRDialog,
     VideoClassifierDialog,
@@ -135,13 +134,17 @@ def _find_next_label_loop_shape(shapes, start_index, canvas_shapes):
     return len(shapes), None
 
 
-def _create_file_status_icon(color):
+def _create_file_status_icon(color, filled=True):
     pixmap = QtGui.QPixmap(12, 12)
     pixmap.fill(Qt.GlobalColor.transparent)
     painter = QtGui.QPainter(pixmap)
     painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
-    painter.setBrush(QtGui.QColor(color))
-    painter.setPen(Qt.PenStyle.NoPen)
+    if filled:
+        painter.setBrush(QtGui.QColor(color))
+        painter.setPen(Qt.PenStyle.NoPen)
+    else:
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.setPen(QtGui.QPen(QtGui.QColor(color), 1.5))
     painter.drawEllipse(2, 2, 8, 8)
     painter.end()
     return QtGui.QIcon(pixmap)
@@ -238,9 +241,7 @@ class LabelingWidget(LabelDialog):
         self._batch_edit_warning_shown = False
         self._batch_processing_active = False
 
-        self.brightness_contrast_dialog = BrightnessContrastDialog(
-            self.on_new_brightness_contrast, parent=self
-        )
+        self.brightness_contrast_processor = BrightnessContrastProcessor()
 
         # Main widgets and related state.
         self.label_dialog = LabelDialog(
@@ -355,7 +356,9 @@ class LabelingWidget(LabelDialog):
         self.file_list_widget.setIconSize(QtCore.QSize(12, 12))
         self.file_status_icons = {
             True: _create_file_status_icon(FILE_CHECKED_COLOR),
-            False: _create_file_status_icon(FILE_UNCHECKED_COLOR),
+            False: _create_file_status_icon(
+                FILE_UNCHECKED_COLOR, filled=False
+            ),
         }
         self.file_list_widget.itemSelectionChanged.connect(
             self.file_selection_changed
@@ -401,6 +404,7 @@ class LabelingWidget(LabelDialog):
 
         self.canvas = self.label_list.canvas = Canvas(
             parent=self,
+            label_font_size=self._config["canvas"]["label_font_size"],
             epsilon=self._config["canvas"]["epsilon"],
             double_click=self._config["canvas"]["double_click"],
             num_backups=self._config["canvas"]["num_backups"],
@@ -1274,20 +1278,6 @@ class LabelingWidget(LabelDialog):
             checkable=True,
             enabled=False,
         )
-        brightness_contrast = action(
-            self.tr("Set Brightness Contrast"),
-            self.brightness_contrast,
-            None,
-            "color",
-            "Adjust brightness and contrast",
-            enabled=False,
-        )
-        set_cross_line = action(
-            self.tr("Set Cross Line"),
-            self.set_cross_line,
-            tip=self.tr("Adjust cross line for mouse position"),
-            icon="cartesian",
-        )
         show_groups = action(
             self.tr("Show Groups"),
             lambda x: self.set_canvas_params("show_groups", x),
@@ -1900,8 +1890,6 @@ class LabelingWidget(LabelDialog):
             keep_prev_contrast=keep_prev_contrast,
             fit_window=fit_window,
             fit_width=fit_width,
-            brightness_contrast=brightness_contrast,
-            set_cross_line=set_cross_line,
             show_groups=show_groups,
             show_masks=show_masks,
             show_texts=show_texts,
@@ -2015,7 +2003,6 @@ class LabelingWidget(LabelDialog):
                 digit_shortcut_8,
                 digit_shortcut_9,
                 edit_mode,
-                brightness_contrast,
                 toggle_annotation_checked,
                 shape_manager,
                 loop_thru_labels,
@@ -2207,9 +2194,6 @@ class LabelingWidget(LabelDialog):
                 None,
                 fit_window,
                 fit_width,
-                None,
-                brightness_contrast,
-                set_cross_line,
                 None,
                 show_masks,
                 show_texts,
@@ -2615,6 +2599,7 @@ class LabelingWidget(LabelDialog):
             apply_callback=self._settings_runtime_applier.apply_change,
             parent=self,
             defer_runtime_apply=True,
+            preview_keys={"shape.line_width", "canvas.crosshair.width"},
         )
         self._settings_runtime_applier.build_shortcut_action_map()
 
@@ -2993,11 +2978,17 @@ class LabelingWidget(LabelDialog):
             current_index, total_count = self.get_image_progress_info()
             basename = osp.basename(str(self.filename))
             dirty_marker = "*" if self.dirty else ""
+            checked_status = (
+                self.tr("Checked")
+                if self._annotation_checked()
+                else self.tr("Unchecked")
+            )
             image_size = ""
             if hasattr(self, "image") and not self.image.isNull():
                 image_size = f" [{self.image.width()}x{self.image.height()}]"
             title = (
-                f"{title} - {basename}{dirty_marker}{image_size} "
+                f"{title} - {basename}{dirty_marker} [{checked_status}]"
+                f"{image_size} "
                 f"[{current_index}/{total_count}]"
             )
         return title
@@ -3078,7 +3069,7 @@ class LabelingWidget(LabelDialog):
             self.image_tags_widget.set_interactions_enabled(False)
             self.image_tags_widget.set_tags([])
         self.canvas.reset_state()
-        self.brightness_contrast_dialog.clear_image()
+        self.brightness_contrast_processor.clear_image()
         if hasattr(self, "canvas_adjustment"):
             self.canvas_adjustment.hide()
         self.compare_view_manager.reset()
@@ -3997,6 +3988,7 @@ class LabelingWidget(LabelDialog):
     def _sync_annotation_checked_state(self):
         self._update_annotation_checked_action()
         self._update_current_file_checked_item()
+        self.update_progress_title()
 
     def set_annotation_checked(self, checked):
         if self.filename is None or self.image.isNull():
@@ -5750,30 +5742,21 @@ class LabelingWidget(LabelDialog):
         self.zoom_mode = self.FIT_WIDTH if value else self.MANUAL_ZOOM
         self.adjust_scale()
 
-    def set_cross_line(self):
-        crosshair_dialog = CrosshairSettingsDialog(**self.crosshair_settings)
-        if crosshair_dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
-            crosshair_settings = crosshair_dialog.get_settings()
-            show = crosshair_settings["show"]
-            width = crosshair_settings["width"]
-            color = crosshair_settings["color"]
-            opacity = crosshair_settings["opacity"]
-            self.canvas.set_cross_line(show, width, color, opacity)
-            self._config["canvas"]["crosshair"] = crosshair_settings
-
     def set_canvas_params(self, key, value):
         self._config[key] = value
         assert hasattr(self.canvas, key), f"Canvas has no attribute {key}"
         setattr(self.canvas, key, value)
         self.canvas.update()
 
-    def open_settings_dialog(self):
+    def open_settings_dialog(self, _checked=False, field_key=None):
         if self._settings_controller is None:
             return
         if self._settings_dialog is None:
             self._settings_dialog = SettingsDialog(
                 self, self._settings_controller
             )
+        if field_key is not None:
+            self._settings_dialog.show_field(field_key)
         self._settings_dialog.show()
         self._settings_dialog.raise_()
         self._settings_dialog.activateWindow()
@@ -5788,11 +5771,6 @@ class LabelingWidget(LabelDialog):
         self.canvas.update()
         self.set_dirty()
 
-    def on_new_brightness_contrast(self, qimage):
-        self.canvas.load_pixmap(
-            QtGui.QPixmap.fromImage(qimage), clear_shapes=False
-        )
-
     def _on_shape_opacity_changed(self, value):
         """Update label/shape opacity from the slider value (0-100)."""
         self.canvas.shape_opacity = value / 100.0
@@ -5801,15 +5779,17 @@ class LabelingWidget(LabelDialog):
     def _on_inline_brightness_contrast(self, brightness, contrast):
         """Apply brightness/contrast from the inline adjustment sliders.
 
-        Reuses ``brightness_contrast_dialog`` so 16-bit grayscale handling is
-        shared with the menu-driven dialog. ``dialog.img`` is refreshed on
-        every image load (see ``load_file``).
+        Reuses ``brightness_contrast_processor`` so 16-bit grayscale handling
+        remains supported. The source image is refreshed on every image load.
         """
         if self.image_data is None or self.filename is None:
             return
-        dialog = self.brightness_contrast_dialog
-        dialog.set_values(brightness, contrast)
-        dialog.on_new_value()
+        qimage = self.brightness_contrast_processor.adjust(
+            brightness, contrast
+        )
+        self.canvas.load_pixmap(
+            QtGui.QPixmap.fromImage(qimage), clear_shapes=False
+        )
         self.brightness_contrast_values[self.filename] = (brightness, contrast)
 
     def _position_canvas_adjustment(self):
@@ -5833,27 +5813,6 @@ class LabelingWidget(LabelDialog):
         ):
             self._position_canvas_adjustment()
         return super().eventFilter(obj, event)
-
-    def brightness_contrast(self, _):
-        self.brightness_contrast_dialog.update_image(
-            utils.img_data_to_pil(self.image_data)
-        )
-
-        brightness, contrast = self.brightness_contrast_values.get(
-            self.filename, (None, None)
-        )
-        self.brightness_contrast_dialog.set_values(
-            brightness if brightness is not None else 50,
-            contrast if contrast is not None else 50,
-        )
-
-        self.brightness_contrast_dialog.exec()
-
-        brightness = self.brightness_contrast_dialog.slider_brightness.value()
-        contrast = self.brightness_contrast_dialog.slider_contrast.value()
-        self.brightness_contrast_values[self.filename] = (brightness, contrast)
-        # Keep the inline adjustment sliders in sync with the dialog.
-        self.canvas_adjustment.set_brightness_contrast(brightness, contrast)
 
     def hide_selected_polygons(self):
         shapes_to_hide = []
@@ -6103,18 +6062,18 @@ class LabelingWidget(LabelDialog):
                 self.recent_files[0], (None, None)
             )
         self.brightness_contrast_values[self.filename] = (brightness, contrast)
-        # Always refresh the dialog's source image so the inline adjustment
-        # sliders can reuse its brightness/contrast pipeline (which includes
-        # 16-bit grayscale handling).
-        self.brightness_contrast_dialog.update_image(
+        # Always refresh the source image used by the inline adjustment panel.
+        self.brightness_contrast_processor.update_image(
             utils.img_data_to_pil(self.image_data)
         )
-        self.brightness_contrast_dialog.set_values(
-            brightness if brightness is not None else 50,
-            contrast if contrast is not None else 50,
-        )
         if brightness is not None or contrast is not None:
-            self.brightness_contrast_dialog.on_new_value()
+            qimage = self.brightness_contrast_processor.adjust(
+                brightness if brightness is not None else 50,
+                contrast if contrast is not None else 50,
+            )
+            self.canvas.load_pixmap(
+                QtGui.QPixmap.fromImage(qimage), clear_shapes=False
+            )
         # Sync the inline adjustment sliders (50 is the neutral value).
         self.canvas_adjustment.set_brightness_contrast(
             brightness if brightness is not None else 50,

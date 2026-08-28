@@ -95,6 +95,7 @@ fit_to_content:
 
 # canvas
 canvas:
+  label_font_size: 8
   epsilon: 10.0
   # None: do nothing
   # close: close polygon

@@ -231,6 +231,58 @@ class TestLabelConverterObbBounds(unittest.TestCase):
             self.assertEqual(f.read(), "")
 
 
+class TestLabelConverterYoloExport(unittest.TestCase):
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        classes_file = os.path.join(self.temp_dir.name, "classes.txt")
+        with open(classes_file, "w", encoding="utf-8") as f:
+            f.write("person\n")
+        self.converter = LabelConverter(classes_file=classes_file)
+
+    def _export(self, mode, shape):
+        label_file = os.path.join(self.temp_dir.name, f"{mode}.json")
+        output_file = os.path.join(self.temp_dir.name, f"{mode}.txt")
+        with open(label_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "imagePath": "image.jpg",
+                    "imageWidth": 100,
+                    "imageHeight": 50,
+                    "shapes": [shape],
+                },
+                f,
+            )
+        self.converter.custom_to_yolo(label_file, output_file, mode)
+        with open(output_file, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def test_hbb_export(self):
+        output = self._export(
+            "hbb",
+            {
+                "label": "person",
+                "shape_type": "rectangle",
+                "points": [[10, 10], [90, 10], [90, 40], [10, 40]],
+            },
+        )
+
+        self.assertEqual(output, "0 0.500000 0.500000 0.800000 0.600000\n")
+
+    def test_seg_export(self):
+        output = self._export(
+            "seg",
+            {
+                "label": "person",
+                "shape_type": "polygon",
+                "points": [[0, 0], [100, 0], [100, 50]],
+            },
+        )
+
+        self.assertEqual(output, "0 0.0 0.0 0.99 0.0 0.99 0.98\n")
+
+
 class TestLabelConverterMaskExport(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
