@@ -6,7 +6,8 @@ image for each JSON label, and runs the repository's patched
 `Depth Anything V2 (ViT-Large)` model directly without opening the GUI.
 
 Output path follows the current local X-AnyLabeling modification:
-    <camera_dir>/x-anylabeling-depth/{timestamp}_depth.npy
+    <run>/images/<camera>/{timestamp}.jpg
+    -> <run>/depth/<camera>/{timestamp}_depth.npy
 
 Example:
     python tools/generate_depth_from_report.py \
@@ -34,13 +35,13 @@ if str(REPO_ROOT) not in sys.path:
 
 from anylabeling.services.auto_labeling.depth_anything_v2 import (  # noqa: E402
     DepthAnythingV2,
+    depth_output_path,
 )
 from anylabeling.config import set_work_directory  # noqa: E402
 from anylabeling import config as anylabeling_config  # noqa: E402
 
 
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
-DEPTH_DIRNAME = "x-anylabeling-depth"
 
 
 @dataclass(frozen=True)
@@ -49,14 +50,6 @@ class ReportItem:
     camera: str
     timestamp: str
     json_path: Path
-
-    @property
-    def output_path(self) -> Path:
-        return (
-            self.json_path.parent
-            / DEPTH_DIRNAME
-            / f"{self.json_path.stem}_depth.npy"
-        )
 
 
 def parse_report(report_path: Path) -> list[ReportItem]:
@@ -191,7 +184,7 @@ def run(
                 missing_images += 1
                 continue
 
-            output_path = item.output_path
+            output_path = depth_output_path(image_path)
             if output_path.exists() and not overwrite:
                 print(f"{prefix} -> skip existing: {output_path}")
                 skipped_existing += 1

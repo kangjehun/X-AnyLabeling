@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+
 import cv2
 import numpy as np
 
@@ -11,6 +13,31 @@ from .model import Model
 from .types import AutoLabelingResult
 from .engines.build_onnx_engine import OnnxBaseModel
 from . import _THUMBNAIL_RENDER_MODELS
+
+
+DEPTH_DIRECTORY_NAME = "depth"
+RAW_DEPTH_SUFFIX = "_depth.npy"
+
+
+def depth_output_path(image_path):
+    """Return the relative-depth NPY path corresponding to an image.
+
+    Dataset images use the canonical mapping
+    ``<run>/images/<relative path>`` -> ``<run>/depth/<relative path>``.
+    Images outside an ``images`` tree retain a compatible local fallback under
+    ``<image directory>/depth``.
+    """
+    image_path = Path(image_path).expanduser().resolve()
+    images_root = next(
+        (parent for parent in image_path.parents if parent.name == "images"),
+        None,
+    )
+    if images_root is None:
+        output_dir = image_path.parent / DEPTH_DIRECTORY_NAME
+    else:
+        relative_parent = image_path.parent.relative_to(images_root)
+        output_dir = images_root.parent / DEPTH_DIRECTORY_NAME / relative_parent
+    return output_dir / f"{image_path.stem}{RAW_DEPTH_SUFFIX}"
 
 
 class DepthAnythingV2(Model):
@@ -46,7 +73,7 @@ class DepthAnythingV2(Model):
         self.input_shape = self.net.get_input_shape()[-2:]
         self.render_mode = self.config.get("render_mode", "color")
         self.device = "cuda" if __preferred_device__ == "GPU" else "cpu"
-        self.save_dir, self.file_ext = _THUMBNAIL_RENDER_MODELS[
+        _, self.file_ext = _THUMBNAIL_RENDER_MODELS[
             "depth_anything_v2"
         ]
         self.min_depth = self.config.get("min_depth", None)
@@ -93,9 +120,13 @@ class DepthAnythingV2(Model):
             (orig_w, orig_h),
             interpolation=cv2.INTER_CUBIC,
         )
-        depth_normalized = (depth_resized - depth_resized.min()) / (
-            depth_resized.max() - depth_resized.min()
-        )
+        depth_min = depth_resized.min()
+        depth_range = depth_resized.max() - depth_min
+        if depth_range > 0:
+            depth_normalized = (depth_resized - depth_min) / depth_range
+        else:
+            depth_normalized = np.zeros_like(depth_resized)
+        depth_normalized = depth_normalized.astype(np.float32, copy=False)
         depth_visual = (depth_normalized * 255.0).astype("uint8")
         if self.render_mode == "color":
             depth_visual = cv2.applyColorMap(
@@ -106,7 +137,7 @@ class DepthAnythingV2(Model):
             depth_calibrated = (
                 depth_normalized * (self.max_depth - self.min_depth)
                 + self.min_depth
-            )
+            ).astype(np.float32, copy=False)
             return depth_visual, depth_calibrated
         return depth_visual
 
@@ -128,26 +159,19 @@ class DepthAnythingV2(Model):
         outputs = self.forward(blob)
         result = self.postprocess(outputs, orig_shape)
 
-        image_dir_path = os.path.dirname(image_path)
-        save_path = os.path.join(image_dir_path, self.save_dir)
-        save_path = os.path.realpath(save_path)
-        os.makedirs(save_path, exist_ok=True)
-        image_file_name = os.path.basename(image_path)
-        save_name = os.path.splitext(image_file_name)[0] + self.file_ext
-        save_file = os.path.join(save_path, save_name)
+        depth_raw_file = depth_output_path(image_path)
+        save_path = depth_raw_file.parent
+        save_path.mkdir(parents=True, exist_ok=True)
+        save_file = save_path / f"{Path(image_path).stem}{self.file_ext}"
 
         if isinstance(result, tuple):
             depth_visual, depth_calibrated = result
             if self.save_raw_depth:
-                depth_raw_name = (
-                    os.path.splitext(image_file_name)[0] + "_depth.npy"
-                )
-                depth_raw_file = os.path.join(save_path, depth_raw_name)
                 np.save(depth_raw_file, depth_calibrated)
             else:
-                cv2.imwrite(save_file, depth_visual)
+                cv2.imwrite(str(save_file), depth_visual)
         else:
-            cv2.imwrite(save_file, result)
+            cv2.imwrite(str(save_file), result)
 
         return AutoLabelingResult([], replace=False)
 

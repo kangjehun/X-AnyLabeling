@@ -4,7 +4,8 @@
 
 - 입력: `label_check_reports/segmentation_only_items.txt`
 - 대상: report 표의 `Scenario | Camera | Timestamp | JSON Path`
-- 출력: 각 카메라 폴더 아래 `x-anylabeling-depth/{timestamp}_depth.npy`
+- 표준 출력: `<run>/depth/<camera>/{timestamp}_depth.npy`
+- 입력 이미지가 `images/` 트리 밖에 있으면 호환 경로인 `<image_dir>/depth/{timestamp}_depth.npy`에 저장
 
 ## 용도
 

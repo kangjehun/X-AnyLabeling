@@ -12,11 +12,22 @@
 # 변경 전 (원본): 이미지 폴더의 상위에 저장 → 카메라 간 파일 충돌
 save_path = os.path.join(image_dir_path, "..", self.save_dir)
 
-# 변경 후: 이미지 폴더 하위에 저장 → 카메라별 독립 저장
-save_path = os.path.join(image_dir_path, self.save_dir)
+# 변경 후: images/ 기준 상대 경로를 run/depth/에 그대로 유지
+depth_raw_file = depth_output_path(image_path)
 ```
 
-출력 경로가 `CAMERA_X/../x-anylabeling-depth/`에서 `CAMERA_X/x-anylabeling-depth/`로 변경됨.
+표준 데이터셋에서는 다음처럼 이미지와 depth가 일대일로 대응한다.
+
+```text
+<run>/images/front/123.jpg
+<run>/labels/front/123.png
+<run>/labels_json/front/123.json
+<run>/depth/front/123_depth.npy
+```
+
+`images/` 아래의 카메라 또는 추가 하위 디렉터리는 `depth/` 아래에도 그대로
+보존된다. `images/` 트리 밖의 이미지를 직접 실행하는 기존 워크플로우는
+`<image_dir>/depth/<stem>_depth.npy`를 호환 경로로 사용한다.
 
 ### 수정 2. Depth 저장 시 NPY 단독 저장
 
@@ -51,6 +62,10 @@ save_raw_depth: true
 ```
 
 `min_depth: 0.0, max_depth: 1.0`이면 내부 계산 `normalized * (1.0 - 0.0) + 0.0`이 항등 변환이 되어 relative depth (float32, [0, 1])가 그대로 `.npy`로 저장됨.
+
+IAC depth 생성에는 위 설정이 적용된 `Depth Anything V2 (ViT-Large)`를 기본
+모델로 사용한다. `save_raw_depth: true`이므로 PNG preview는 저장하지 않고
+`*_depth.npy`만 저장한다.
 
 ---
 
