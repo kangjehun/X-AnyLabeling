@@ -6,7 +6,7 @@
 
 ### 수정 1. Depth 저장 경로 변경
 
-`anylabeling/services/auto_labeling/depth_anything_v2.py:132`
+`anylabeling/services/auto_labeling/depth_anything_v2.py`
 
 ```python
 # 변경 전 (원본): 이미지 폴더의 상위에 저장 → 카메라 간 파일 충돌
@@ -31,7 +31,7 @@ depth_raw_file = depth_output_path(image_path)
 
 ### 수정 2. Depth 저장 시 NPY 단독 저장
 
-`anylabeling/services/auto_labeling/depth_anything_v2.py:139-148`
+`anylabeling/services/auto_labeling/depth_anything_v2.py`
 
 ```python
 # 변경 전 (원본): save_raw_depth=true 시 PNG + NPY 둘 다 저장
