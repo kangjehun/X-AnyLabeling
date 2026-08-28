@@ -78,6 +78,7 @@ Semantic segmentation은 `polygon`, 차량 2D bbox는 `car_2dbbox`와 `rectangle
 ## 목차
 
 - [환경 구성](#환경-구성)
+  - [batch07 데이터 열기](#batch07-데이터-열기)
 - [Part A. Semantic Segmentation](#part-a-semantic-segmentation)
   - [A1. 개요](#a1-개요)
   - [A2. 지원 모델](#a2-지원-모델)
@@ -104,42 +105,118 @@ Semantic segmentation은 `polygon`, 차량 2D bbox는 `car_2dbbox`와 `rectangle
 ### 사전 요구사항
 
 - Python 3.11 ~ 3.13 (3.12 권장)
-- GPU 사용 시: CUDA 11.x 또는 CUDA 12.x 및 호환 드라이버
-- Conda (Miniconda 또는 Anaconda)
+- GPU 사용 시: CUDA 11.x, 12.x 또는 13.x 및 호환 드라이버
+- `curl` 또는 `wget` (`uv` 설치에 사용)
 
-### Conda 환경 생성 및 설치
+### 권장: uv 환경 생성 및 커스텀 소스 설치
+
+`uv`는 Python이나 `pip`가 없어도 독립적으로 설치할 수 있다. 시스템
+Python에 `pip`를 추가하지 않고, 저장소 안에 전용 가상환경을 만드는
+방식을 권장한다.
 
 ```bash
-# 환경 생성
-conda create --name x-anylabeling python=3.12 -y
-conda activate x-anylabeling
+# Conda 환경이 활성화되어 있다면 먼저 비활성화
+conda deactivate  # Conda를 사용하지 않았다면 생략
 
-# 소스 기반 설치
+# Linux/macOS/WSL2: uv 설치
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 현재 셸에 uv 경로 반영(또는 터미널을 다시 연다)
+source "$HOME/.local/bin/env"
+uv --version
+
+# 저장소로 이동
 cd /path/to/X-AnyLabeling
-pip install -U uv
 
-# GPU (CUDA 12.x)
+# 아래에서 사용하는 환경 하나만 생성하고 활성화한다.
+
+# GPU, CUDA 12.x (기본 권장)
+uv venv --python 3.12 .venv-cu12
+source .venv-cu12/bin/activate
 uv pip install -e ".[gpu]"
 
 # GPU (CUDA 11.x)
-# uv pip install -e ".[gpu-cu11]"
+uv venv --python 3.12 .venv-cu11
+source .venv-cu11/bin/activate
+uv pip install -e ".[gpu-cu11]"
+
+# GPU (CUDA 13.x)
+uv venv --python 3.12 .venv-cu13
+source .venv-cu13/bin/activate
+uv pip install -e ".[gpu-cu13]"
 
 # CPU
-# uv pip install -e ".[cpu]"
+uv venv --python 3.12 .venv-cpu
+source .venv-cpu/bin/activate
+uv pip install -e ".[cpu]"
 ```
 
-> `onnxruntime`과 `onnxruntime-gpu`가 동시에 설치되지 않도록 주의한다.
+한 번에 하나의 환경만 선택한다. 예를 들어 CUDA 12를 사용한다면
+`.venv-cu12` 생성·활성화와 `.[gpu]` 설치 명령만 실행한다.
 
-pip 패키지 설치:
+`-e`는 현재 저장소를 editable 모드로 설치한다. 이후 `custom/main`에서
+Python 소스를 수정하면 패키지를 매번 다시 설치하지 않아도 변경 내용이
+반영된다. 의존성이나 패키지 설정을 변경했을 때는 설치 명령을 다시
+실행한다.
+
+> `onnxruntime`과 `onnxruntime-gpu`가 한 환경에 동시에 설치되지 않도록
+> 주의한다.
+
+### 대안: Conda 환경 사용
+
+Conda를 계속 사용하려면 환경을 만들 때 Python과 `pip`도 함께 설치한다.
+
+```bash
+conda create --name x-anylabeling python=3.12 pip -y
+conda activate x-anylabeling
+
+python -m pip install -U uv
+
+cd /path/to/X-AnyLabeling
+
+# CUDA 12.x 예시
+uv pip install -e ".[gpu]"
+```
+
+프롬프트에 `(x-anylabeling)`이 표시되더라도 다음 명령에서 아무 경로도
+나오지 않으면 Python 없이 빈 Conda 환경만 만들어진 상태다.
+
+```bash
+which python
+```
+
+이 경우 시스템 패키지인 `python-is-python3` 또는 `python3-pip`를 설치하지
+말고 현재 Conda 환경에 Python을 추가한다.
+
+```bash
+conda install --name x-anylabeling python=3.12 pip
+conda activate x-anylabeling
+
+which python
+python --version
+```
+
+`which python`은 Miniconda/Anaconda 아래의 `x-anylabeling/bin/python` 경로를,
+`python --version`은 `Python 3.12.x`를 출력해야 한다.
+
+### PyPI 배포판 설치
+
+로컬 커스텀 코드를 사용하지 않고 공식 배포판만 설치할 때 사용한다.
+이 프로젝트의 커스텀 변경을 사용하려면 이 명령 대신 위의
+`uv pip install -e ".[gpu]"`와 같은 editable 설치를 사용한다.
+
 
 ```bash
 # GPU (CUDA 12.x)
-uv pip install x-anylabeling-cvhub[gpu]
+uv pip install "x-anylabeling-cvhub[gpu]"
 ```
 
 ### 설치 확인
 
 ```bash
+which python
+python --version
+uv pip check
 xanylabeling checks
 ```
 
@@ -168,7 +245,11 @@ Packages
 ### 실행
 
 ```bash
-conda activate x-anylabeling
+# uv 환경을 사용한 경우(CUDA 12 예시)
+source .venv-cu12/bin/activate
+
+# Conda 환경을 사용한 경우에는 위 명령 대신 다음을 실행
+# conda activate x-anylabeling
 
 # 기본 실행
 xanylabeling
@@ -178,6 +259,25 @@ xanylabeling --filename /path/to/image_dir
 ```
 
 모델은 `Ctrl+A`로 AI 모델 패널을 열어 선택한다. 최초 사용 시 `~/xanylabeling_data/models/` 경로에 자동 다운로드된다.
+
+### batch07 데이터 열기
+
+```bash
+source /home/legatalee/Research/X-AnyLabeling/.venv-cu12/bin/activate
+
+xanylabeling \
+  --filename /home/legatalee/Dataset/INDY/PIDNET/batch07/images \
+  --output /home/legatalee/Dataset/INDY/PIDNET/batch07/labels \
+  --labels /home/legatalee/Dataset/INDY/PIDNET/batch07/labels/classes.txt \
+  --validatelabel exact
+```
+
+- `--filename`: 이미지 디렉토리
+- `--output`: JSON 라벨을 불러오고 저장할 디렉토리
+- `--labels`: 클래스 목록 TXT 파일
+- `--validatelabel exact`: 목록에 있는 클래스만 허용
+
+다른 batch는 세 경로의 `batch07`을 해당 batch 이름으로 변경한다.
 
 ---
 
