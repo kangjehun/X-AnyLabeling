@@ -67,6 +67,27 @@ IAC depth 생성에는 위 설정이 적용된 `Depth Anything V2 (ViT-Large)`�
 모델로 사용한다. `save_raw_depth: true`이므로 PNG preview는 저장하지 않고
 `*_depth.npy`만 저장한다.
 
+구조화된 IAC 데이터셋의 `legacy`, `new_runs`, `runs` 전체에 대해 재시작 가능한
+배치 생성을 실행하려면 다음 명령을 사용한다. 이미 존재하며 검증을 통과한 NPY는
+건너뛰므로 중간에 중단되더라도 같은 명령으로 이어서 실행할 수 있다.
+
+```bash
+cd /home/legatalee/Research/X-AnyLabeling
+
+IAC_CUDA_LIBS="$(find /home/legatalee/miniconda3/envs/racingdino/lib/python3.10/site-packages/nvidia \
+  -mindepth 2 -maxdepth 2 -type d -name lib -print | sort | paste -sd:)"
+
+LD_LIBRARY_PATH="$IAC_CUDA_LIBS:/usr/local/cuda-12.6/targets/x86_64-linux/lib" \
+  .venv-cu12/bin/python tools/generate_depth_dataset.py \
+  --dataset-root /home/legatalee/Dataset/INDY/pidnet_26LS
+```
+
+실제 추론 없이 파일 대응과 출력 대상을 먼저 확인하려면 `--dry-run`, 특정 그룹만
+실행하려면 `--group legacy`처럼 지정한다. 기본 모델 config는
+`depth_anything_v2_vit_l.yaml`이다. 배치 도구는 CUDA provider가 로드되지 않을
+때 CPU로 조용히 fallback하지 않고 오류를 내므로, 위 명령처럼 현재 워크스테이션의
+cuDNN/CUDA 라이브러리 경로를 전달한다.
+
 ---
 
 ## 라벨 클래스 정의
