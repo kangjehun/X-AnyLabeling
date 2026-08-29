@@ -67,9 +67,9 @@ IAC depth 생성에는 위 설정이 적용된 `Depth Anything V2 (ViT-Large)`�
 모델로 사용한다. `save_raw_depth: true`이므로 PNG preview는 저장하지 않고
 `*_depth.npy`만 저장한다.
 
-구조화된 IAC 데이터셋의 `legacy`, `new_runs`, `runs` 전체에 대해 재시작 가능한
-배치 생성을 실행하려면 다음 명령을 사용한다. 이미 존재하며 검증을 통과한 NPY는
-건너뛰므로 중간에 중단되더라도 같은 명령으로 이어서 실행할 수 있다.
+구조화된 IAC 데이터셋의 `legacy`, `new_legacy`, `new_runs`, `runs` 전체에 대해
+재시작 가능한 배치 생성을 실행하려면 다음 명령을 사용한다. 이미 존재하며 검증을
+통과한 NPY는 건너뛰므로 중간에 중단되더라도 같은 명령으로 이어서 실행할 수 있다.
 
 ```bash
 cd /home/legatalee/Research/X-AnyLabeling

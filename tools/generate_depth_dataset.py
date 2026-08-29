@@ -30,7 +30,7 @@ from anylabeling.services.auto_labeling.depth_anything_v2 import (  # noqa: E402
 )
 
 
-DEFAULT_GROUPS = ("legacy", "new_runs", "runs")
+DEFAULT_GROUPS = ("legacy", "new_legacy", "new_runs", "runs")
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 IGNORED_DIRECTORY_NAMES = {"_delete_"}
 
@@ -283,7 +283,7 @@ def parse_args():
         "--group",
         action="append",
         choices=DEFAULT_GROUPS,
-        help="Dataset group to process; repeatable (default: all three).",
+        help="Dataset group to process; repeatable (default: all four).",
     )
     parser.add_argument(
         "--run",
