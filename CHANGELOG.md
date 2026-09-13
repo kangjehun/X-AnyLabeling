@@ -1,5 +1,26 @@
 # X-AnyLabeling Changelog
 
+## `v4.0.6` (Sep 05, 2026)
+
+X-AnyLabeling 4.0.6 expands external training and model deployment workflows, adds more control to auto-labeling runs, and improves custom model management.
+
+### 🚀 New Features
+
+- Enhance external Ultralytics training with isolated Python workers, environment and device detection, workspace snapshots, reusable organized datasets, WSL path resolution, background execution, improved logs and previews, and deployable ONNX export configurations.
+- Add optional start and end image ranges for Auto Run, with localized controls and validation.
+- Allow custom auto-labeling models to be removed directly from the searchable model dropdown.
+
+### 🐛 Bug Fixes
+
+- Preserve label edit mode after uploading attributes. (#1445)
+- Reset an image's checked status when auto-labeling inference modifies its annotations.
+
+### 🌟 Contributors
+
+A total of 2 developers contributed to this release.
+
+Thank @atirna, @CVHub520
+
 ## `v4.0.5` (Aug 28, 2026)
 
 X-AnyLabeling 4.0.5 improves nested YOLO dataset handling, refines canvas and review visuals, and hardens Windows builds.
